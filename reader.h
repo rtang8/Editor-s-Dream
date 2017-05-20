@@ -19,17 +19,17 @@ class reader {
 
 struct Occurances {
     size_t count;
-    size_t paragraphNum;
-    size_t lineNum;
+    vector<size_t> paragraphNum;
+    vector<size_t> lineNum;
 };
 
 private:
     size_t wordCount;
     size_t sentenceCount;
     size_t paragraphCount;
-    size_t syllableCount;
+    int syllableCount;
 
-    map<string, size_t> totalWords;
+    map<char, size_t> totalWords;
     map<string, Occurances> wordLocations;
 
     size_t fleschScore;
@@ -40,9 +40,12 @@ private:
     void deleteAll();
 
     string getParagraph(ifstream &fin);
-    void processParagraph(ifstream &fin, const string paragraph);
-    string getNextWord(stringstream &ss, size_t &lineCount);
-    void countSyllable();
+    void processParagraph(string &paragraph);
+    vector<string> splitString(const string &input, size_t &lineCount);
+
+    void countSyllable(string input);
+    bool isVowel(char &ch);
+    bool isValid(char &ch);
 
     double getFleschScore();
     string translateScore(const double &score);
@@ -68,16 +71,15 @@ public:
 reader::reader(string filename) {
     wordCount = 0;
     paragraphCount = 0;
+    sentenceCount = 0;
     syllableCount = 0;
     fleschScore = 0;
     fileName = filename;
 }
 
-
 reader::reader(const reader &other) {
     copy(other);
 }
-
 
 reader &reader::operator=(const reader &other) {
     if(this != &other)
@@ -85,14 +87,12 @@ reader &reader::operator=(const reader &other) {
     return *this;
 }
 
-
-reader::~reader() {
-}
-
+reader::~reader() {}
 
 void reader::copy(const reader &other) {
     wordCount = other.wordCount;
     paragraphCount = other.paragraphCount;
+    sentenceCount = other.sentenceCount;
     syllableCount = other.syllableCount;
     fleschScore = other.fleschScore;
     fileName = other.fileName;
@@ -113,18 +113,15 @@ void reader::process() {
         paragraph = getParagraph(fin);
 
         // Processes each word of the paragraph
-        processParagraph(fin, paragraph);
-
-
-        /// DEBUG OUTPUT
-        cout << paragraph << endl;
+        processParagraph(paragraph);
 
     }
     cout << "Total word count: " << wordCount << endl;
     cout << "Total paragraph count: " << paragraphCount << endl;
+    cout << "Flesch Score: " << getFleschScore() << endl;
+    cout << "Reading Level: " << translateScore(getFleschScore()) << endl;
     fin.close();
 }
-
 
 string reader::getParagraph(ifstream &fin) {
 
@@ -147,68 +144,113 @@ string reader::getParagraph(ifstream &fin) {
 
 }
 
-void reader::processParagraph(ifstream &fin, const string paragraph) {
+void reader::processParagraph(string &paragraph) {
 
-    // Puts the string into a stream
-    stringstream ss;
-    ss << paragraph;
+    // Splits string and stores in vector
+    size_t lineCount = 1;
+    vector<string> words = splitString(paragraph, lineCount);
 
-    // Adds one to corresponding word on map
-    string stringIndex;
-    size_t lineCount = 0;
-    while(((stringIndex = getNextWord(ss, lineCount)) != "" )) {
-        //++totalWords[stringIndex];
-        ++wordCount;
-        ++wordLocations[stringIndex].count;
-        wordLocations[stringIndex].paragraphNum = paragraphCount;
-        wordLocations[stringIndex].lineNum = lineCount;
+    wordCount += words.size();
+
+    for(size_t i = 0; i < words.size(); ++i) {
+        ++wordLocations[words[i]].count;
+        ++totalWords[words[i][0]];
+        wordLocations[words[i]].paragraphNum.push_back(paragraphCount);
+        string temp = words[i];
+        countSyllable(temp);
     }
 
-    // DEBUG :: PRINTS OUT MAP
-    map<string, Occurances>::iterator iter = wordLocations.begin();
-    while(iter != wordLocations.end()) {
-        cout << iter->first << ' ' << iter->second.count << endl;
-        cout << iter->second.paragraphNum << " | " << iter->second.lineNum << endl;
-        ++iter;
-    }
-}
+    sentenceCount += --lineCount;
 
-string reader::getNextWord(stringstream &ss, size_t &lineCount) {
-
-    char strScan;
-    string fullWord;
-
-    // Gets first character
-    strScan = ss.get();
-
-    // Ignores characters that are not in the alphabet
-    while(!(isalpha(strScan)) && !ss.eof())
-        strScan = ss.get();
-
-    // Add good characters onto string until space
-    while(isalpha(strScan) || strScan == '\'') {
-        fullWord += tolower(strScan);
-        strScan = ss.get();
-    }
-
-    if(strScan == '.' || strScan == '!' || strScan == '?')
-        ++lineCount;
-
-    // Capitalizes first letter of word before indexing
-    fullWord[0] = toupper(fullWord[0]);
-
-    return fullWord;
-
-}
-
-void reader::countSyllable() {
-
+    /// DEBUG :: PRINTS OUT MAP
+//    map<string, Occurances>::iterator iter = wordLocations.begin();
+//    while(iter != wordLocations.end()) {
+//        cout << iter->first << ' ' << iter->second.count << endl;
+//        for(size_t i = 0; i < iter->second.paragraphNum.size(); ++i)
+//            cout << iter->second.paragraphNum[i] << " | " << iter->second.lineNum[i] << endl;
+//        ++iter;
+//    }
 }
 
 
+/// Splits string by whitespace and inserts elements into vector
+vector<string> reader::splitString(const string &input, size_t &lineCount) {
+
+    vector<string> words;
+    string temp;
+
+    stringstream su(input);
+
+    // Adds words to vector 'words' using whitespace as delimiter
+    while (su >> temp) {
+
+        // Removes non-alphabetical chars except ' and counts sentences
+        for(size_t i = 0; i < temp.size(); ++i) {
+            if((temp[i] == '.' || temp[i] == '!' || temp[i] == '?') )
+                ++lineCount;
+            if(!(isalpha(temp[i])) && temp[i] != '\'' && temp[i] != '-')
+                temp.erase(temp.begin() + i);
+        }
+
+        // Remove ending quotes after punctuations like "water?"
+        if(temp[temp.size() - 1] == '\"')
+            temp.pop_back();
+
+        // Capitalizes first char. before indexing
+        temp[0] = toupper(temp[0]);
+
+        // Stores the line number of word within paragraph
+        wordLocations[temp].lineNum.push_back(lineCount);
+
+        words.push_back(temp);
+    }
+
+    return words;
+}
+
+/// Roughly estimates syllable count for flesch score
+void reader::countSyllable(string input) {
+
+    size_t tempCount = 0;
+    size_t i = 0;
+
+    // Ignores groups of vowels and consonants
+    while (i < input.size()) {
+
+        // Skips over non-vowels but ensures against buffer-overflow
+        while(!isVowel(input[i]) && isValid(input[i]))
+            ++i;
+
+        // Does not do final increment if ends in consonants
+        if(i >= input.size()) break;
+
+        // Skips blocks of vowels before adding one
+        while(isVowel(input[i])) ++i;
+
+        ++tempCount;
+    }
+
+    // Ignores silent e at end (Most cases in English)
+    if(input[input.size() - 1] == 'e' && tempCount != 1)
+        --tempCount;
+
+    syllableCount += tempCount;
+}
+
+bool reader::isVowel(char &ch) {
+    ch = tolower(ch);
+    return ch == 'a' || ch == 'e' || ch == 'i' || ch == 'o' || ch == 'u' || ch == 'y';
+}
+
+bool reader::isValid(char &ch) {
+    return (isalpha(ch) || ispunct(ch) || isdigit(ch));
+}
+
+/// Retrieves score which determines reading level of piece
 double reader::getFleschScore() {
     if(sentenceCount == 0 || wordCount == 0) throw BAD_CALCULATION;
-    return 206.835 - (1.015 * (wordCount / sentenceCount) - (84.6 * (syllableCount / wordCount)));
+    return 206.835 - (1.015 * (wordCount * 1.0  / sentenceCount)) -
+                     (84.6 * (syllableCount * 1.0 / wordCount));
 }
 
 string reader::translateScore(const double &score) {
