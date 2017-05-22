@@ -8,6 +8,7 @@ using namespace std;
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
+#include <chrono>
 
 #include <vector>
 #include <map>
@@ -33,8 +34,8 @@ private:
     map<string, Occurances> wordLocations;
 
     size_t fleschScore;
-
     string fileName;
+    size_t procTime;
 
     void copy(const reader &other);
     void deleteAll();
@@ -50,7 +51,6 @@ private:
     double getFleschScore();
     string translateScore(const double &score);
 
-
 public:
     reader();
     reader(string fileName = "");
@@ -59,6 +59,7 @@ public:
     ~reader();
 
     void process();
+    void printInfo();
 
     void printFileName() const;
 
@@ -103,6 +104,9 @@ void reader::copy(const reader &other) {
 ///
 void reader::process() {
 
+    // Records time before operation
+    auto t_start = chrono::high_resolution_clock::now();
+
     ifstream fin;
     fin.open(fileName.c_str());
 
@@ -116,11 +120,12 @@ void reader::process() {
         processParagraph(paragraph);
 
     }
-    cout << "Total word count: " << wordCount << endl;
-    cout << "Total paragraph count: " << paragraphCount << endl;
-    cout << "Flesch Score: " << getFleschScore() << endl;
-    cout << "Reading Level: " << translateScore(getFleschScore()) << endl;
+
     fin.close();
+
+    // Records final time and prints processing time
+    auto t_end = chrono::high_resolution_clock::now();
+    procTime = chrono::duration_cast<chrono::milliseconds>(t_end - t_start).count();
 }
 
 string reader::getParagraph(ifstream &fin) {
@@ -152,24 +157,16 @@ void reader::processParagraph(string &paragraph) {
 
     wordCount += words.size();
 
+    // Indexes the word in the appropriate vectors
     for(size_t i = 0; i < words.size(); ++i) {
         ++wordLocations[words[i]].count;
-        ++totalWords[words[i][0]];
+        if (isalpha(words[i][0]))
+            ++totalWords[words[i][0]];
         wordLocations[words[i]].paragraphNum.push_back(paragraphCount);
-        string temp = words[i];
-        countSyllable(temp);
+        countSyllable(words[i]);
     }
 
     sentenceCount += --lineCount;
-
-    /// DEBUG :: PRINTS OUT MAP
-//    map<string, Occurances>::iterator iter = wordLocations.begin();
-//    while(iter != wordLocations.end()) {
-//        cout << iter->first << ' ' << iter->second.count << endl;
-//        for(size_t i = 0; i < iter->second.paragraphNum.size(); ++i)
-//            cout << iter->second.paragraphNum[i] << " | " << iter->second.lineNum[i] << endl;
-//        ++iter;
-//    }
 }
 
 
@@ -186,7 +183,7 @@ vector<string> reader::splitString(const string &input, size_t &lineCount) {
 
         // Removes non-alphabetical chars except ' and counts sentences
         for(size_t i = 0; i < temp.size(); ++i) {
-            if((temp[i] == '.' || temp[i] == '!' || temp[i] == '?') )
+            if((temp[i] == '.' || temp[i] == '!' || temp[i] == '?'))
                 ++lineCount;
             if(!(isalpha(temp[i])) && temp[i] != '\'' && temp[i] != '-')
                 temp.erase(temp.begin() + i);
@@ -195,6 +192,10 @@ vector<string> reader::splitString(const string &input, size_t &lineCount) {
         // Remove ending quotes after punctuations like "water?"
         if(temp[temp.size() - 1] == '\"')
             temp.pop_back();
+
+        //
+        if(temp[0] == '\'' || temp[1] == '\"')
+            temp.erase(temp.begin());
 
         // Capitalizes first char. before indexing
         temp[0] = toupper(temp[0]);
@@ -269,6 +270,36 @@ string reader::translateScore(const double &score) {
     else if(score < 100)
         return "5th Grade";
     else throw INVALID_SCORE;
+}
+
+void reader::printInfo() {
+
+    cout << endl << "******* TEXT INFORMATION ********" << endl;
+    cout << "Processing Time :  " << procTime  << "ms"  << endl;
+    cout << "Word count      :  " << wordCount          << endl;
+    cout << "Paragraph count :  " << paragraphCount     << endl;
+    cout << "Reading Level   :  " << translateScore(getFleschScore());
+    cout << endl << "*********************************" << endl;
+
+    string barrier("-----------------------------------------");
+    // Prints out the number of words starting with each letter
+    cout << barrier << endl;
+    cout << "Number of words starting with each letter" << endl;
+    for(auto elem : totalWords)
+       cout << elem.first << " : " << elem.second << endl;
+    cout << barrier << endl;
+
+    /// DEBUG :: PRINTS OUT MAP
+    map<string, Occurances>::iterator iter = wordLocations.begin();
+    while(iter != wordLocations.end()) {
+        cout << iter->first << ' ' << iter->second.count << endl;
+        for(size_t i = 0; i < iter->second.paragraphNum.size(); ++i)
+            cout << "Paragraph: " << iter->second.paragraphNum[i]
+                 << " | Sentence: " << iter->second.lineNum[i] << endl;
+        ++iter;
+    }
+    cout << endl;
+
 }
 
 void reader::printFileName() const {

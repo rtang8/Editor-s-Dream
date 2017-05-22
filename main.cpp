@@ -55,6 +55,7 @@ void process(ifstream &fin, const string &fileName) {
     reader read(fileName);
     read.process();
     read.printFileName();
+    read.printInfo();
 }
 
 ////////////////////////////////////////////////////////////
