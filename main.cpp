@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
         if(f == BAD_CALCULATION)
             cout << "Error processing file." << endl;
         if(f == INVALID_SCORE)
-            cout << "Invlaid Flesch score." << endl;
+            cout << "Invalid Flesch score." << endl;
     }
     catch (...) {
         cout << "Unknown error occured." << endl;
@@ -55,7 +55,8 @@ void process(ifstream &fin, const string &fileName) {
     reader read(fileName);
     read.process();
     read.printFileName();
-    read.printInfo();
+    read.printInfo(cout);
+    read.printToFile();
 }
 
 ////////////////////////////////////////////////////////////

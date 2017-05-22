@@ -48,6 +48,15 @@ private:
     bool isVowel(char &ch);
     bool isValid(char &ch);
 
+    void printTopTen(ostream &out);
+    bool askToPrintOccurances();
+    bool askToPrintLoc();
+    bool askToPrintFile();
+    bool getInput();
+    string askForFileName();
+
+    bool checkFileExist(const string &fileName);
+
     double getFleschScore();
     string translateScore(const double &score);
 
@@ -59,7 +68,8 @@ public:
     ~reader();
 
     void process();
-    void printInfo();
+    void printInfo(ostream &out);
+    void printToFile();
 
     void printFileName() const;
 
@@ -159,11 +169,13 @@ void reader::processParagraph(string &paragraph) {
 
     // Indexes the word in the appropriate vectors
     for(size_t i = 0; i < words.size(); ++i) {
-        ++wordLocations[words[i]].count;
-        if (isalpha(words[i][0]))
-            ++totalWords[words[i][0]];
-        wordLocations[words[i]].paragraphNum.push_back(paragraphCount);
-        countSyllable(words[i]);
+        if(isalpha(words[i][0])) {
+            ++wordLocations[words[i]].count;
+            //if (isalpha(words[i][0]))
+                ++totalWords[words[i][0]];
+            wordLocations[words[i]].paragraphNum.push_back(paragraphCount);
+            countSyllable(words[i]);
+        }
     }
 
     sentenceCount += --lineCount;
@@ -185,23 +197,28 @@ vector<string> reader::splitString(const string &input, size_t &lineCount) {
         for(size_t i = 0; i < temp.size(); ++i) {
             if((temp[i] == '.' || temp[i] == '!' || temp[i] == '?'))
                 ++lineCount;
-            if(!(isalpha(temp[i])) && temp[i] != '\'' && temp[i] != '-')
+            if((/*isdigit(temp[i]) ||*/ ispunct(temp[i])) && temp[i] != '\'')
+                temp.erase(temp.begin() + i);
+
+            // Not sure why ispunct() doesn't catch this
+            if(temp[i] == '-')
                 temp.erase(temp.begin() + i);
         }
 
         // Remove ending quotes after punctuations like "water?"
-        if(temp[temp.size() - 1] == '\"')
+        if(temp[temp.size() - 1] == '\"' || temp[temp.size() - 1] == '\'')
             temp.pop_back();
 
-        //
-        if(temp[0] == '\'' || temp[1] == '\"')
+        // Deletes words starting with quotes
+        if(temp[0] == '\'' || temp[0] == '\"')
             temp.erase(temp.begin());
 
         // Capitalizes first char. before indexing
         temp[0] = toupper(temp[0]);
 
         // Stores the line number of word within paragraph
-        wordLocations[temp].lineNum.push_back(lineCount);
+        if(isalpha(temp[0]))
+            wordLocations[temp].lineNum.push_back(lineCount);
 
         words.push_back(temp);
     }
@@ -244,11 +261,12 @@ bool reader::isVowel(char &ch) {
 }
 
 bool reader::isValid(char &ch) {
-    return (isalpha(ch) || ispunct(ch) || isdigit(ch));
+    return (isalnum(ch) || ispunct(ch));
 }
 
 /// Retrieves score which determines reading level of piece
 double reader::getFleschScore() {
+    if(sentenceCount == 0) ++sentenceCount;
     if(sentenceCount == 0 || wordCount == 0) throw BAD_CALCULATION;
     return 206.835 - (1.015 * (wordCount * 1.0  / sentenceCount)) -
                      (84.6 * (syllableCount * 1.0 / wordCount));
@@ -269,37 +287,138 @@ string reader::translateScore(const double &score) {
         return "6th Grade";
     else if(score < 100)
         return "5th Grade";
+    else if(score > 100)
+        return "Below 5th Grade";
     else throw INVALID_SCORE;
 }
 
-void reader::printInfo() {
+void reader::printInfo(ostream &out) {
 
-    cout << endl << "******* TEXT INFORMATION ********" << endl;
-    cout << "Processing Time :  " << procTime  << "ms"  << endl;
-    cout << "Word count      :  " << wordCount          << endl;
-    cout << "Paragraph count :  " << paragraphCount     << endl;
-    cout << "Reading Level   :  " << translateScore(getFleschScore());
-    cout << endl << "*********************************" << endl;
+    out << endl << "******* TEXT INFORMATION ********" << endl;
+    out << "Processing Time :  " << procTime  << "ms"  << endl;
+    out << "Word count      :  " << wordCount          << endl;
+    out << "Paragraph count :  " << paragraphCount     << endl;
+    out << "Reading Level   :  " << translateScore(getFleschScore());
+    out << endl << "*********************************" << endl;
 
-    string barrier("-----------------------------------------");
     // Prints out the number of words starting with each letter
-    cout << barrier << endl;
-    cout << "Number of words starting with each letter" << endl;
+    string barrier("-----------------------------------------");
+    out << barrier << endl;
+    out << "Number of words starting with each letter" << endl;
     for(auto elem : totalWords)
-       cout << elem.first << " : " << elem.second << endl;
-    cout << barrier << endl;
+       out << elem.first << " : " << elem.second << endl;
+    out << barrier << endl;
 
-    /// DEBUG :: PRINTS OUT MAP
-    map<string, Occurances>::iterator iter = wordLocations.begin();
-    while(iter != wordLocations.end()) {
-        cout << iter->first << ' ' << iter->second.count << endl;
-        for(size_t i = 0; i < iter->second.paragraphNum.size(); ++i)
-            cout << "Paragraph: " << iter->second.paragraphNum[i]
-                 << " | Sentence: " << iter->second.lineNum[i] << endl;
+    // Prints top ten words
+    printTopTen(out);
+    out << barrier << endl;
+
+    // Asks user if they want to print occurances
+    bool printOcc = askToPrintOccurances();
+
+    // Prints out all occurances and asks if user wants to print locations
+    if(printOcc) {
+
+        bool printLoc = askToPrintLoc();
+
+        map<string, Occurances>::iterator iter = wordLocations.begin();
+        while(iter != wordLocations.end()) {
+            out << "Word: " << iter->first
+                << " | Occurances: " << iter->second.count << endl;
+
+            // WARNING :: THIS WILL PRINT OUT EVERY LOCATION OF EACH WORD
+            if(printLoc) {
+            for(size_t i = 0; i < iter->second.paragraphNum.size(); ++i)
+                out << " " << "Paragraph: " << iter->second.paragraphNum[i]
+                    << " | Sentence: " << iter->second.lineNum[i] << endl;
+            }
+            ++iter;
+        }
+    }
+    out << endl;
+}
+
+void reader::printTopTen(ostream &out) {
+
+    out << "Top ten most frequent words" << endl;
+
+    // Creates a map with # of occurances as key
+    multimap<size_t, string> reverseMap;
+    for(map<string, Occurances>::const_iterator it = wordLocations.begin();
+        it != wordLocations.end(); ++it)
+            reverseMap.insert(pair<size_t, string>(it -> second.count, it -> first));
+
+    // Prints out first ten values
+    size_t breaker = 0;
+    multimap<size_t, string>::const_reverse_iterator iter = reverseMap.rbegin();
+    while(++breaker <= 10 && iter != reverseMap.rend()) {
+        out << "Count: " << iter->first << " " << iter->second << endl;
         ++iter;
     }
-    cout << endl;
 
+}
+
+bool reader::askToPrintOccurances() {
+    cout << "Do you want to print the number of occurances of each word? (Y/N) : ";
+    return getInput();
+}
+
+bool reader::askToPrintLoc() {
+    cout << "Do you want to print the locations of each word?" << endl;
+    cout << "WARNING: This is highly unrecommended for large texts! (Y/N) : ";
+    return getInput();
+}
+
+bool reader::askToPrintFile() {
+    cout << "Do you want to print the information to a file? (Y/N) : ";
+    return getInput();
+}
+
+bool reader::getInput() {
+    string input;
+    getline(cin, input);
+    return (toupper(input[0]) == 'Y') ? true : false;
+}
+
+void reader::printToFile() {
+    if(askToPrintFile()) {
+        bool overwrite = false;
+        string outFileName;
+        outFileName = askForFileName();
+
+        ofstream fout;
+        fout.open(outFileName.c_str());
+        printInfo(fout);
+        fout.close();
+        cout << "Successfully saved info to " << outFileName << endl;
+    }
+}
+
+string reader::askForFileName() {
+
+    string input;
+    cout << "Please enter a filename: ";
+    getline(cin, input);
+    input = input.substr(0, input.find(" "));
+    cout << input << endl;
+
+    // Keeps asking for filename if already exists
+    while(checkFileExist(input)) {
+        cout << "Error: File already exists." << endl;
+        cout << "Please enter another filename: ";
+        getline(cin, input);
+        input = input.substr(0, input.find(" "));
+        cout << input << endl;
+    }
+
+    return input;
+}
+
+bool reader::checkFileExist(const string &fileName) {
+    ifstream fin;
+    fin.open(fileName.c_str());
+    fin.close();
+    return fin.good();
 }
 
 void reader::printFileName() const {
