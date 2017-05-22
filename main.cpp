@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     }
     catch (mainErrors e) {
         if(e == IMPROPER_USE)
-            cout << "Proper usage: ./process <filename>" << endl;
+            cout << "Proper usage: ./Process <filename>" << endl;
         if(e == FILE_DOES_NOT_EXIST)
             cout << "File does not exist!" << endl;
     }

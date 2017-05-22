@@ -171,8 +171,7 @@ void reader::processParagraph(string &paragraph) {
     for(size_t i = 0; i < words.size(); ++i) {
         if(isalpha(words[i][0])) {
             ++wordLocations[words[i]].count;
-            //if (isalpha(words[i][0]))
-                ++totalWords[words[i][0]];
+            ++totalWords[words[i][0]];
             wordLocations[words[i]].paragraphNum.push_back(paragraphCount);
             countSyllable(words[i]);
         }
@@ -197,12 +196,10 @@ vector<string> reader::splitString(const string &input, size_t &lineCount) {
         for(size_t i = 0; i < temp.size(); ++i) {
             if((temp[i] == '.' || temp[i] == '!' || temp[i] == '?'))
                 ++lineCount;
-            if((/*isdigit(temp[i]) ||*/ ispunct(temp[i])) && temp[i] != '\'')
+            if((isdigit(temp[i]) || ispunct(temp[i])) && temp[i] != '\'') {
                 temp.erase(temp.begin() + i);
-
-            // Not sure why ispunct() doesn't catch this
-            if(temp[i] == '-')
-                temp.erase(temp.begin() + i);
+                --i;
+            }
         }
 
         // Remove ending quotes after punctuations like "water?"
@@ -235,7 +232,7 @@ void reader::countSyllable(string input) {
     // Ignores groups of vowels and consonants
     while (i < input.size()) {
 
-        // Skips over non-vowels but ensures against buffer-overflow
+        // Skips over non-vowels and ensures against buffer-overflow
         while(!isVowel(input[i]) && isValid(input[i]))
             ++i;
 
@@ -292,6 +289,9 @@ string reader::translateScore(const double &score) {
     else throw INVALID_SCORE;
 }
 
+///////////////////////////////////////////////////////////////////////
+/// PRINTING FUNCTIONS
+///
 void reader::printInfo(ostream &out) {
 
     out << endl << "******* TEXT INFORMATION ********" << endl;
@@ -382,7 +382,6 @@ bool reader::getInput() {
 
 void reader::printToFile() {
     if(askToPrintFile()) {
-        bool overwrite = false;
         string outFileName;
         outFileName = askForFileName();
 
