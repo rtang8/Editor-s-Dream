@@ -16,6 +16,8 @@ using namespace std;
 
 enum readerErrors {BAD_CALCULATION, INVALID_SCORE};
 
+
+template <typename T = string>
 class reader {
 
 struct Occurances {
@@ -79,7 +81,8 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////////
 /// CONSTRUCTORS
 ///
-reader::reader(string filename) {
+template<typename T>
+reader<T>::reader(string filename) {
     wordCount = 0;
     paragraphCount = 0;
     sentenceCount = 0;
@@ -88,19 +91,23 @@ reader::reader(string filename) {
     fileName = filename;
 }
 
-reader::reader(const reader &other) {
+template<typename T>
+reader<T>::reader(const reader &other) {
     copy(other);
 }
 
-reader &reader::operator=(const reader &other) {
+template<typename T>
+reader<T> &reader<T>::operator=(const reader &other) {
     if(this != &other)
         copy(other);
     return *this;
 }
 
-reader::~reader() {}
+template<typename T>
+reader<T>::~reader() {}
 
-void reader::copy(const reader &other) {
+template<typename T>
+void reader<T>::copy(const reader &other) {
     wordCount = other.wordCount;
     paragraphCount = other.paragraphCount;
     sentenceCount = other.sentenceCount;
@@ -112,7 +119,8 @@ void reader::copy(const reader &other) {
 ///////////////////////////////////////////////////////////////////////////////
 /// PRIMARY FUNCTIONS
 ///
-void reader::process() {
+template<typename T>
+void reader<T>::process() {
 
     // Records time before operation
     auto t_start = chrono::high_resolution_clock::now();
@@ -138,7 +146,8 @@ void reader::process() {
     procTime = chrono::duration_cast<chrono::milliseconds>(t_end - t_start).count();
 }
 
-string reader::getParagraph(ifstream &fin) {
+template<typename T>
+string reader<T>::getParagraph(ifstream &fin) {
 
     string output, line;
 
@@ -159,7 +168,8 @@ string reader::getParagraph(ifstream &fin) {
 
 }
 
-void reader::processParagraph(string &paragraph) {
+template<typename T>
+void reader<T>::processParagraph(string &paragraph) {
 
     // Splits string and stores in vector
     size_t lineCount = 1;
@@ -182,7 +192,8 @@ void reader::processParagraph(string &paragraph) {
 
 
 /// Splits string by whitespace and inserts elements into vector
-vector<string> reader::splitString(const string &input, size_t &lineCount) {
+template<typename T>
+vector<string> reader<T>::splitString(const string &input, size_t &lineCount) {
 
     vector<string> words;
     string temp;
@@ -224,7 +235,8 @@ vector<string> reader::splitString(const string &input, size_t &lineCount) {
 }
 
 /// Roughly estimates syllable count for flesch score
-void reader::countSyllable(string input) {
+template<typename T>
+void reader<T>::countSyllable(string input) {
 
     size_t tempCount = 0;
     size_t i = 0;
@@ -252,24 +264,28 @@ void reader::countSyllable(string input) {
     syllableCount += tempCount;
 }
 
-bool reader::isVowel(char &ch) {
+template<typename T>
+bool reader<T>::isVowel(char &ch) {
     ch = tolower(ch);
     return ch == 'a' || ch == 'e' || ch == 'i' || ch == 'o' || ch == 'u' || ch == 'y';
 }
 
-bool reader::isValid(char &ch) {
+template<typename T>
+bool reader<T>::isValid(char &ch) {
     return (isalnum(ch) || ispunct(ch));
 }
 
 /// Retrieves score which determines reading level of piece
-double reader::getFleschScore() {
+template<typename T>
+double reader<T>::getFleschScore() {
     if(sentenceCount == 0) ++sentenceCount;
     if(sentenceCount == 0 || wordCount == 0) throw BAD_CALCULATION;
     return 206.835 - (1.015 * (wordCount * 1.0  / sentenceCount)) -
                      (84.6 * (syllableCount * 1.0 / wordCount));
 }
 
-string reader::translateScore(const double &score) {
+template<typename T>
+string reader<T>::translateScore(const double &score) {
     if(score < 30 && score >= 0)
         return "College Graduate";
     else if(score < 50)
@@ -292,7 +308,8 @@ string reader::translateScore(const double &score) {
 ///////////////////////////////////////////////////////////////////////
 /// PRINTING FUNCTIONS
 ///
-void reader::printInfo(ostream &out) {
+template<typename T>
+void reader<T>::printInfo(ostream &out) {
 
     out << endl << "******* TEXT INFORMATION ********" << endl;
     out << "Processing Time :  " << procTime  << "ms"  << endl;
@@ -321,7 +338,7 @@ void reader::printInfo(ostream &out) {
 
         bool printLoc = askToPrintLoc();
 
-        map<string, Occurances>::iterator iter = wordLocations.begin();
+        typename map<string, Occurances>::iterator iter = wordLocations.begin();
         while(iter != wordLocations.end()) {
             out << "Word: " << iter->first
                 << " | Occurances: " << iter->second.count << endl;
@@ -338,13 +355,14 @@ void reader::printInfo(ostream &out) {
     out << endl;
 }
 
-void reader::printTopTen(ostream &out) {
+template<typename T>
+void reader<T>::printTopTen(ostream &out) {
 
     out << "Top ten most frequent words" << endl;
 
     // Creates a map with # of occurances as key
     multimap<size_t, string> reverseMap;
-    for(map<string, Occurances>::const_iterator it = wordLocations.begin();
+    for(typename map<string, Occurances>::const_iterator it = wordLocations.begin();
         it != wordLocations.end(); ++it)
             reverseMap.insert(pair<size_t, string>(it -> second.count, it -> first));
 
@@ -358,29 +376,34 @@ void reader::printTopTen(ostream &out) {
 
 }
 
-bool reader::askToPrintOccurances() {
+template<typename T>
+bool reader<T>::askToPrintOccurances() {
     cout << "Do you want to print the number of occurances of each word? (Y/N) : ";
     return getInput();
 }
 
-bool reader::askToPrintLoc() {
+template<typename T>
+bool reader<T>::askToPrintLoc() {
     cout << "Do you want to print the locations of each word?" << endl;
     cout << "WARNING: This is highly unrecommended for large texts! (Y/N) : ";
     return getInput();
 }
 
-bool reader::askToPrintFile() {
+template<typename T>
+bool reader<T>::askToPrintFile() {
     cout << "Do you want to print the information to a file? (Y/N) : ";
     return getInput();
 }
 
-bool reader::getInput() {
+template<typename T>
+bool reader<T>::getInput() {
     string input;
     getline(cin, input);
     return (toupper(input[0]) == 'Y') ? true : false;
 }
 
-void reader::printToFile() {
+template<typename T>
+void reader<T>::printToFile() {
     if(askToPrintFile()) {
         string outFileName;
         outFileName = askForFileName();
@@ -393,7 +416,8 @@ void reader::printToFile() {
     }
 }
 
-string reader::askForFileName() {
+template<typename T>
+string reader<T>::askForFileName() {
 
     string input;
     cout << "Please enter a filename: ";
@@ -413,14 +437,16 @@ string reader::askForFileName() {
     return input;
 }
 
-bool reader::checkFileExist(const string &fileName) {
+template<typename T>
+bool reader<T>::checkFileExist(const string &fileName) {
     ifstream fin;
     fin.open(fileName.c_str());
     fin.close();
     return fin.good();
 }
 
-void reader::printFileName() const {
+template<typename T>
+void reader<T>::printFileName() const {
     cout << "File name is " << fileName << endl;
 }
 

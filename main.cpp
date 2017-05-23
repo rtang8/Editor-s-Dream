@@ -52,7 +52,7 @@ void readCommandLine(int argc, char *argv[], string &fileName) {
 ///
 void process(ifstream &fin, const string &fileName) {
     checkFileExist(fin, fileName);
-    reader read(fileName);
+    reader<string> read(fileName);
     read.process();
     read.printFileName();
     read.printInfo(cout);
